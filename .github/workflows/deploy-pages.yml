@@ -24,10 +24,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # 키 등 빌드 설정은 저장소의 .env.production 파일에서 읽습니다
       - run: npm run build
-        env:
-          # 저장소 Settings → Secrets and variables → Actions → Variables 에 등록하면 검색 기능 활성화 (선택)
-          VITE_YOUTUBE_API_KEY: ${{ vars.VITE_YOUTUBE_API_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

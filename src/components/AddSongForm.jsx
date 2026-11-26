@@ -61,9 +61,9 @@ export default function AddSongForm({ onAdd, compact = false }) {
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            inputMode="url"
-            enterKeyHint="send"
-            placeholder={SEARCH_ENABLED ? '유튜브 링크 또는 검색어' : '유튜브 링크 붙여넣기'}
+            inputMode={SEARCH_ENABLED ? 'search' : 'url'}
+            enterKeyHint={SEARCH_ENABLED ? 'search' : 'send'}
+            placeholder={SEARCH_ENABLED ? '가수, 노래 제목 또는 유튜브 링크' : '유튜브 링크 붙여넣기'}
             className={`w-full rounded-xl border border-zinc-800 bg-zinc-900 pl-9 pr-3 text-zinc-100 outline-none
               placeholder:text-zinc-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20
               ${compact ? 'h-10 text-sm' : 'h-12 text-base'}`}
