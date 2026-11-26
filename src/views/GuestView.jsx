@@ -57,7 +57,13 @@ export default function GuestView({ hostId }) {
             <h1 className="text-base font-bold leading-tight text-white">Jukebox Remote</h1>
             <p className={`flex items-center gap-1 text-xs ${connected ? 'text-emerald-400' : 'text-amber-400'}`}>
               {connected ? <Wifi className="h-3 w-3" /> : status === 'connecting' ? <Loader2 className="h-3 w-3 animate-spin" /> : <WifiOff className="h-3 w-3" />}
-              {connected && mode === 'relay' ? '연결됨 (중계 모드)' : STATUS_TEXT[status]}
+              {mode === 'relay'
+                ? connected
+                  ? '연결됨 (중계 모드)'
+                  : status === 'reconnecting'
+                    ? '중계 모드: 호스트 응답 없음 (재시도 중…)'
+                    : '중계 모드로 연결 중…'
+                : STATUS_TEXT[status]}
             </p>
           </div>
         </div>

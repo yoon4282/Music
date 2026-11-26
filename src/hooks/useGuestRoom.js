@@ -32,6 +32,7 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
     let pingTimer = null;
     let attempts = 0;
     let relayMode = false;
+    let everOpened = false; // P2P가 한 번이라도 열렸는지
     let lastHostMessage = 0;
     const peer = new Peer(PEER_OPTIONS);
 
@@ -90,6 +91,7 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
 
       conn.on('open', () => {
         clearTimeout(openTimer);
+        everOpened = true;
         attempts = 0;
         setStatus('connected');
         conn.send({ type: 'hello', nickname: nicknameRef.current });
@@ -97,6 +99,13 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
       conn.on('data', handleHostMessage);
       const onLost = () => {
         if (disposed || connRef.current !== conn || relayMode) return;
+        clearTimeout(openTimer);
+        // 한 번도 열리지 못하고 실패 → 방화벽이 P2P를 막는 네트워크. 바로 중계 모드로.
+        if (!everOpened) {
+          startRelay();
+          return;
+        }
+        // 잘 되던 P2P가 끊김 → P2P 재시도
         setStatus('reconnecting');
         scheduleRetry();
       };
@@ -109,6 +118,7 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
     });
     peer.on('error', (err) => {
       if (disposed) return;
+      if (relayMode) return; // 중계 모드에서는 호스트 응답 여부(ping/pong)로만 상태 판단
       if (err.type === 'peer-unavailable') {
         setStatus('not-found');
         scheduleRetry();
