@@ -43,7 +43,9 @@ export default function QrPanel({ joinUrl, status, error, guests }) {
             접속 <b className="tabular-nums">{guests.length}</b>명
           </span>
           {guests.length > 0 && (
-            <span className="truncate text-xs text-zinc-500">({guests.map((g) => g.nickname).join(', ')})</span>
+            <span className="truncate text-xs text-zinc-500">
+              ({guests.map((g) => g.nickname + (g.relay ? '·중계' : '')).join(', ')})
+            </span>
           )}
         </div>
 

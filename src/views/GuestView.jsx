@@ -5,7 +5,6 @@ import QueueList from '../components/QueueList.jsx';
 import PlayerControls from '../components/PlayerControls.jsx';
 import Toasts from '../components/Toasts.jsx';
 import { useGuestRoom } from '../hooks/useGuestRoom.js';
-import { TURN_CONFIGURED } from '../lib/peer.js';
 import { useToasts } from '../hooks/useToasts.js';
 
 const NICK_KEY = 'jukebox:nickname';
@@ -24,7 +23,6 @@ const STATUS_TEXT = {
   connected: '연결됨',
   reconnecting: '연결이 끊겨 재연결 중…',
   'not-found': '방을 찾을 수 없어요. 호스트 화면이 켜져 있는지 확인하세요.',
-  blocked: '네트워크가 P2P 연결을 막고 있어요 (재시도 중…)',
 };
 
 /** 모바일 리모컨 UI: 영상 플레이어 없이 곡 추가 + 닉네임 + 대기열 */
@@ -32,7 +30,7 @@ export default function GuestView({ hostId }) {
   const { toasts, push } = useToasts();
   const [nickDraft, setNickDraft] = useState(readNick);
   const [nickname, setNickname] = useState(nickDraft);
-  const { status, room, send } = useGuestRoom({ hostId, nickname, onToast: push });
+  const { status, mode, room, send } = useGuestRoom({ hostId, nickname, onToast: push });
 
   // 입력 후 잠시 멈추면 닉네임 확정
   useEffect(() => {
@@ -59,7 +57,7 @@ export default function GuestView({ hostId }) {
             <h1 className="text-base font-bold leading-tight text-white">Jukebox Remote</h1>
             <p className={`flex items-center gap-1 text-xs ${connected ? 'text-emerald-400' : 'text-amber-400'}`}>
               {connected ? <Wifi className="h-3 w-3" /> : status === 'connecting' ? <Loader2 className="h-3 w-3 animate-spin" /> : <WifiOff className="h-3 w-3" />}
-              {STATUS_TEXT[status]}
+              {connected && mode === 'relay' ? '연결됨 (중계 모드)' : STATUS_TEXT[status]}
             </p>
           </div>
         </div>
@@ -69,17 +67,6 @@ export default function GuestView({ hostId }) {
           </span>
         )}
       </header>
-
-      {status === 'blocked' && (
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
-          <p className="font-semibold">연결이 안 되나요?</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-100/80">
-            <li>학교·회사 와이파이는 기기 간 직접 연결(P2P)을 막는 경우가 많아요.</li>
-            <li>휴대폰 <b>와이파이를 끄고 LTE/5G</b>로 다시 접속해 보세요.</li>
-            {!TURN_CONFIGURED && <li>관리자: README의 “방화벽 네트워크(TURN)” 설정을 하면 해결돼요.</li>}
-          </ul>
-        </div>
-      )}
 
       <section className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
         <label className="flex items-center gap-3">

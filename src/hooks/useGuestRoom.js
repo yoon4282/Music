@@ -2,13 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Peer from 'peerjs';
 import { PEER_OPTIONS } from '../lib/peer.js';
 import { reorderLocal } from '../lib/queue.js';
+import { createRelayConn, onRelay, sendRelay } from '../lib/relay.js';
+
+const P2P_TIMEOUT = 8000; // 이 시간 안에 P2P가 안 열리면 중계 모드로 전환
+const PING_INTERVAL = 10000;
+const HOST_SILENCE_LIMIT = 30000;
 
 /**
- * 게스트 쪽: 호스트 Peer ID로 데이터 채널을 열고 상태를 수신.
- * 연결이 끊기면 자동으로 재연결을 시도합니다.
+ * 게스트 쪽: 호스트에 연결해 상태를 수신.
+ * 1) WebRTC P2P 데이터 채널 시도
+ * 2) 방화벽으로 막히면 시그널링 서버 WebSocket을 통한 중계 모드로 자동 전환
  */
 export function useGuestRoom({ hostId, nickname, onToast }) {
-  const [status, setStatus] = useState('connecting'); // connecting | connected | reconnecting | not-found | blocked
+  // connecting | connected | reconnecting | not-found
+  const [status, setStatus] = useState('connecting');
+  const [mode, setMode] = useState('p2p'); // p2p | relay
   const [room, setRoom] = useState(null); // { current, queue, isPlaying, guestCount }
 
   const connRef = useRef(null);
@@ -20,19 +28,54 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
   useEffect(() => {
     let disposed = false;
     let retryTimer = null;
-    let attempts = 0;
     let openTimer = null;
+    let pingTimer = null;
+    let attempts = 0;
+    let relayMode = false;
+    let lastHostMessage = 0;
     const peer = new Peer(PEER_OPTIONS);
 
+    const handleHostMessage = (msg) => {
+      lastHostMessage = Date.now();
+      if (msg?.type === 'state') setRoom(msg.state);
+      else if (msg?.type === 'toast') onToastRef.current?.(msg.message, msg.kind);
+    };
+
     const scheduleRetry = () => {
-      if (disposed) return;
+      if (disposed || relayMode) return;
       clearTimeout(retryTimer);
       attempts += 1;
       retryTimer = setTimeout(connect, Math.min(1000 * 2 ** Math.min(attempts, 4), 15000));
     };
 
+    // ── 중계 모드 ──
+    const offRelay = onRelay(peer, (src, msg) => {
+      if (src !== hostId || !relayMode) return;
+      if (msg?.type !== 'pong') handleHostMessage(msg);
+      else lastHostMessage = Date.now();
+      setStatus('connected');
+    });
+
+    const startRelay = () => {
+      if (disposed || relayMode) return;
+      relayMode = true;
+      clearTimeout(retryTimer);
+      try { connRef.current?.close(); } catch { /* ignore */ }
+      connRef.current = createRelayConn(peer, hostId);
+      setMode('relay');
+      setStatus('connecting');
+      lastHostMessage = Date.now();
+      sendRelay(peer, hostId, { type: 'hello', nickname: nicknameRef.current });
+      pingTimer = setInterval(() => {
+        if (peer.disconnected && !peer.destroyed) peer.reconnect();
+        sendRelay(peer, hostId, { type: 'ping', nickname: nicknameRef.current });
+        if (Date.now() - lastHostMessage > HOST_SILENCE_LIMIT) setStatus('reconnecting');
+      }, PING_INTERVAL);
+    };
+
+    // ── P2P 모드 ──
     function connect() {
-      if (disposed || peer.destroyed) return;
+      if (disposed || peer.destroyed || relayMode) return;
       if (peer.disconnected) peer.reconnect();
       const conn = peer.connect(hostId, {
         reliable: true,
@@ -40,15 +83,10 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
       });
       connRef.current = conn;
 
-      // 시그널링은 됐는데 15초 안에 데이터 채널이 안 열리면 → 방화벽이 P2P를 막는 상황
       clearTimeout(openTimer);
       openTimer = setTimeout(() => {
-        if (!disposed && connRef.current === conn && !conn.open) {
-          setStatus('blocked');
-          conn.close();
-          scheduleRetry();
-        }
-      }, 15000);
+        if (!disposed && connRef.current === conn && !conn.open) startRelay();
+      }, P2P_TIMEOUT);
 
       conn.on('open', () => {
         clearTimeout(openTimer);
@@ -56,23 +94,19 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
         setStatus('connected');
         conn.send({ type: 'hello', nickname: nicknameRef.current });
       });
-      conn.on('data', (msg) => {
-        if (msg?.type === 'state') setRoom(msg.state);
-        else if (msg?.type === 'toast') onToastRef.current?.(msg.message, msg.kind);
-      });
-      conn.on('close', () => {
-        if (disposed || connRef.current !== conn) return;
-        setStatus((st) => (st === 'blocked' ? st : 'reconnecting'));
+      conn.on('data', handleHostMessage);
+      const onLost = () => {
+        if (disposed || connRef.current !== conn || relayMode) return;
+        setStatus('reconnecting');
         scheduleRetry();
-      });
-      conn.on('error', () => {
-        if (disposed || connRef.current !== conn) return;
-        setStatus((st) => (st === 'blocked' ? st : 'reconnecting'));
-        scheduleRetry();
-      });
+      };
+      conn.on('close', onLost);
+      conn.on('error', onLost);
     }
 
-    peer.on('open', connect);
+    peer.on('open', () => {
+      if (!relayMode) connect();
+    });
     peer.on('error', (err) => {
       if (disposed) return;
       if (err.type === 'peer-unavailable') {
@@ -91,6 +125,9 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
       disposed = true;
       clearTimeout(retryTimer);
       clearTimeout(openTimer);
+      clearInterval(pingTimer);
+      if (relayMode) sendRelay(peer, hostId, { type: 'bye' });
+      offRelay();
       peer.destroy();
     };
   }, [hostId]);
@@ -107,7 +144,7 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
       onToastRef.current?.('호스트와 연결되어 있지 않습니다.', 'error');
       return false;
     }
-    // 드래그 순서 변경은 즉시 화면에 반영 (호스트 상태가 곧 덮어씀)
+    // 드래그 순서 변경·삭제는 즉시 화면에 반영 (호스트 상태가 곧 덮어씀)
     if (action.type === 'reorder') {
       setRoom((r) => (r ? { ...r, queue: reorderLocal(r.queue, action.activeId, action.overId) } : r));
     }
@@ -118,5 +155,5 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
     return true;
   }, []);
 
-  return { status, room, send };
+  return { status, mode, room, send };
 }
