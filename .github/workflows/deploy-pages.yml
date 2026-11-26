@@ -28,10 +28,6 @@ jobs:
         env:
           # 저장소 Settings → Secrets and variables → Actions → Variables 에 등록하면 검색 기능 활성화 (선택)
           VITE_YOUTUBE_API_KEY: ${{ vars.VITE_YOUTUBE_API_KEY }}
-          # 학교/회사 와이파이용 TURN 중계 서버 (README 참고)
-          VITE_TURN_USERNAME: ${{ vars.VITE_TURN_USERNAME }}
-          VITE_TURN_CREDENTIAL: ${{ vars.VITE_TURN_CREDENTIAL }}
-          VITE_TURN_URLS: ${{ vars.VITE_TURN_URLS }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

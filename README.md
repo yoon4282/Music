@@ -84,10 +84,7 @@ src/
 학교·회사 와이파이는 기기끼리 직접 연결(P2P)하는 것을 막는 경우가 많습니다. 이때는 **443 포트로 데이터를 중계해 주는 TURN 서버**가 필요합니다. 데이터 양이 아주 작아서 무료 플랜으로 충분합니다.
 
 1. https://www.metered.ca/stun-turn 에서 무료 가입 → 대시보드 **TURN Server → Credentials**에서 `username` / `credential`을 확인합니다.
-2. GitHub 저장소 **Settings → Secrets and variables → Actions → Variables** 탭에서 변수 2개를 추가합니다.
-   - `VITE_TURN_USERNAME` = username 값
-   - `VITE_TURN_CREDENTIAL` = credential 값
-3. **Actions → Deploy to GitHub Pages → Run workflow**로 다시 배포합니다.
+2. 저장소의 `.env.production` 파일에서 `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL` 값을 바꿔 커밋하면 자동으로 다시 배포됩니다.
 
 > TURN 계정 정보는 웹페이지 코드에 포함되므로 누구나 볼 수 있습니다. 무료 플랜 사용량 한도만 주의하면 됩니다.
 
