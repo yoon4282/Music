@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ListMusic, Loader2, Music, Users, Wifi, WifiOff } from 'lucide-react';
 import AddSongForm from '../components/AddSongForm.jsx';
+import ShareButton from '../components/ShareButton.jsx';
 import QueueList from '../components/QueueList.jsx';
 import PlayerControls from '../components/PlayerControls.jsx';
 import Toasts from '../components/Toasts.jsx';
@@ -45,6 +46,7 @@ export default function GuestView({ hostId }) {
   }, [nickDraft, nickname]);
 
   const connected = status === 'connected';
+  const inviteUrl = `${window.location.origin}${window.location.pathname}?hostId=${encodeURIComponent(hostId)}`;
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col gap-4 px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -69,11 +71,14 @@ export default function GuestView({ hostId }) {
             </p>
           </div>
         </div>
-        {room && (
-          <span className="flex items-center gap-1 rounded-full bg-zinc-900 px-3 py-1 text-xs text-zinc-300 ring-1 ring-zinc-800">
-            <Users className="h-3.5 w-3.5" /> {room.guestCount}명
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {room && (
+            <span className="flex items-center gap-1 rounded-full bg-zinc-900 px-3 py-1 text-xs text-zinc-300 ring-1 ring-zinc-800">
+              <Users className="h-3.5 w-3.5" /> {room.guestCount}명
+            </span>
+          )}
+          <ShareButton url={inviteUrl} onToast={push} label="초대" className="h-8 rounded-full px-3 text-xs" />
+        </div>
       </header>
 
       <p className="-mt-2 px-1 text-xs text-zinc-500">

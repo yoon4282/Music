@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ListMusic, Music } from 'lucide-react';
+import { ListMusic, LogIn, Music, RefreshCw } from 'lucide-react';
 import YouTubePlayer from '../components/YouTubePlayer.jsx';
 import PlayerControls from '../components/PlayerControls.jsx';
 import QrPanel from '../components/QrPanel.jsx';
@@ -13,6 +13,10 @@ import { loadState, queueReducer, saveState } from '../lib/queue.js';
 import { fetchVideoMeta, thumbnailUrl } from '../lib/youtube.js';
 import { randomId } from '../lib/id.js';
 
+const YT_LOGIN_URL =
+  'https://accounts.google.com/ServiceLogin?service=youtube&continue=' +
+  encodeURIComponent('https://www.youtube.com/');
+
 const PLAYER_ERRORS = {
   2: '잘못된 영상 ID',
   5: '플레이어 오류',
@@ -24,6 +28,9 @@ const PLAYER_ERRORS = {
 export default function HostView() {
   const [state, dispatch] = useReducer(queueReducer, undefined, loadState);
   const [started, setStarted] = useState(false);
+  const [playerKey, setPlayerKey] = useState(0); // 바뀌면 플레이어를 새로 만듦 (로그인 반영)
+  const [resumeAt, setResumeAt] = useState(0);
+  const [loginOpened, setLoginOpened] = useState(false);
   const playerRef = useRef(null);
   const { toasts, push } = useToasts();
   const restoredCount = useMemo(() => (state.current ? 1 : 0) + state.queue.length, []); // eslint-disable-line
@@ -85,6 +92,8 @@ export default function HostView() {
         <div className="relative aspect-video w-full bg-black md:aspect-auto md:flex-1">
           {started && (
             <YouTubePlayer
+              key={playerKey}
+              startAt={resumeAt}
               ref={playerRef}
               item={state.current}
               onEnded={() => dispatch({ type: 'NEXT' })}
@@ -111,12 +120,45 @@ export default function HostView() {
             onToggle={() => playerRef.current?.toggle()}
             onSkip={() => local({ type: 'skip' })}
           />
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            {!loginOpened ? (
+              <button
+                type="button"
+                onClick={() => {
+                  window.open(YT_LOGIN_URL, 'yt-login', 'width=520,height=720');
+                  setLoginOpened(true);
+                }}
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-1.5 font-medium text-zinc-200 transition hover:bg-zinc-700"
+              >
+                <LogIn className="h-3.5 w-3.5" /> YouTube 로그인
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  // 로그인 쿠키를 반영하려면 플레이어를 새로 만들어야 함 → 현재 위치부터 이어서 재생
+                  setResumeAt(Math.floor(playerRef.current?.getCurrentTime?.() || 0));
+                  setPlayerKey((k) => k + 1);
+                  setLoginOpened(false);
+                  push('플레이어를 새로 불러왔어요. 로그인 상태가 적용됩니다.');
+                }}
+                className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 font-semibold text-white transition hover:bg-red-500"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> 로그인 완료 → 플레이어에 적용
+              </button>
+            )}
+            <span className="text-zinc-500">
+              {loginOpened
+                ? '새 창에서 로그인을 마친 뒤 이 버튼을 눌러주세요'
+                : '유튜브 프리미엄 계정으로 로그인하면 광고 없이 재생돼요'}
+            </span>
+          </div>
         </div>
       </main>
 
       {/* ── 오른쪽(1): 상단 QR / 하단 대기열 ── */}
       <aside className="flex flex-col gap-4 p-4 md:min-h-0">
-        <QrPanel joinUrl={joinUrl} roomCode={peerId} status={status} error={error} guests={guests} />
+        <QrPanel joinUrl={joinUrl} roomCode={peerId} status={status} error={error} guests={guests} onToast={push} />
 
         <section className="flex flex-col rounded-2xl border border-zinc-800 bg-zinc-900/40 md:min-h-0 md:flex-1">
           <header className="flex items-center justify-between gap-2 px-4 pt-4">

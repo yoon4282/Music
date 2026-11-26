@@ -24,7 +24,8 @@ function loadYouTubeApi() {
  * - item({ id, videoId })이 바뀌면 loadVideoById로 즉시 재생
  * - 곡이 끝나면(onStateChange === 0 / YT.PlayerState.ENDED) onEnded 호출
  */
-const YouTubePlayer = forwardRef(function YouTubePlayer({ item, onEnded, onPlayingChange, onError }, ref) {
+const YouTubePlayer = forwardRef(function YouTubePlayer({ item, startAt = 0, onEnded, onPlayingChange, onError }, ref) {
+  const startAtRef = useRef(startAt); // 플레이어를 다시 만들 때 이어서 재생할 위치(초)
   const containerRef = useRef(null);
   const playerRef = useRef(null);
   const [ready, setReady] = useState(false);
@@ -33,6 +34,7 @@ const YouTubePlayer = forwardRef(function YouTubePlayer({ item, onEnded, onPlayi
 
   useImperativeHandle(ref, () => ({
     play: () => playerRef.current?.playVideo?.(),
+    getCurrentTime: () => playerRef.current?.getCurrentTime?.() ?? 0,
     pause: () => playerRef.current?.pauseVideo?.(),
     toggle: () => {
       const p = playerRef.current;
@@ -79,8 +81,10 @@ const YouTubePlayer = forwardRef(function YouTubePlayer({ item, onEnded, onPlayi
   useEffect(() => {
     if (!ready) return;
     const p = playerRef.current;
-    if (videoId) p.loadVideoById(videoId);
-    else p.stopVideo();
+    if (videoId) {
+      p.loadVideoById({ videoId, startSeconds: startAtRef.current || 0 });
+      startAtRef.current = 0; // 이어보기는 첫 곡에만 적용
+    } else p.stopVideo();
     // 같은 영상이 연속으로 예약돼도 다시 로드되도록 item.id를 기준으로 동작
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemKey, ready]);

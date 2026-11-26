@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { AlertTriangle, Check, Copy, Loader2, Maximize2, Users, X } from 'lucide-react';
 import { copyText } from '../lib/clipboard.js';
+import ShareButton from './ShareButton.jsx';
 
 const isLocalHost = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 
-export default function QrPanel({ joinUrl, roomCode, status, error, guests }) {
+export default function QrPanel({ joinUrl, roomCode, status, error, guests, onToast }) {
   const [copied, setCopied] = useState(false);
   const [big, setBig] = useState(false);
 
@@ -89,15 +90,18 @@ export default function QrPanel({ joinUrl, roomCode, status, error, guests }) {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={copy}
-          disabled={!joinUrl}
-          className="flex h-9 items-center justify-center gap-2 rounded-lg bg-zinc-800 px-3 text-sm font-medium text-zinc-100 transition hover:bg-zinc-700 active:scale-95 disabled:opacity-40"
-        >
-          {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-          {copied ? '복사됨!' : '접속 링크 복사'}
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={copy}
+            disabled={!joinUrl}
+            className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-zinc-800 px-2 text-sm font-medium text-zinc-100 transition hover:bg-zinc-700 active:scale-95 disabled:opacity-40"
+          >
+            {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+            {copied ? '복사됨!' : '링크 복사'}
+          </button>
+          <ShareButton url={joinUrl} onToast={onToast} label="카톡 공유" className="h-9 px-2 text-sm" />
+        </div>
 
         {status === 'error' && <p className="text-xs text-red-400">시그널링 서버 연결 실패: {error}</p>}
         {isLocalHost && (
