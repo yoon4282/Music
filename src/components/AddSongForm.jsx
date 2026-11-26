@@ -3,7 +3,7 @@ import { ExternalLink, Loader2, Plus, Search, X } from 'lucide-react';
 import { SEARCH_ENABLED, parseYouTubeId, searchYouTube, youtubeSearchPageUrl } from '../lib/youtube.js';
 
 /** 유튜브 링크 붙여넣기 또는 (API 키가 있으면) 검색으로 곡 추가 */
-export default function AddSongForm({ onAdd, compact = false }) {
+export default function AddSongForm({ onAdd, onSearched, compact = false }) {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState(null);
@@ -37,10 +37,12 @@ export default function AddSongForm({ onAdd, compact = false }) {
     setBusy(true);
     try {
       const found = await searchYouTube(text);
+      onSearched?.({ exhausted: false });
       setResults(found);
       if (!found.length) setHint({ kind: 'error', text: '검색 결과가 없어요.' });
     } catch (err) {
-      setHint({ kind: 'error', text: `검색 실패: ${err.message}` });
+      if (err.quotaExceeded) onSearched?.({ exhausted: true });
+      setHint({ kind: 'error', text: err.quotaExceeded ? err.message : `검색 실패: ${err.message}` });
     } finally {
       setBusy(false);
     }

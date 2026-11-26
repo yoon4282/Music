@@ -10,8 +10,10 @@ import Toasts from '../components/Toasts.jsx';
 import { useHostRoom } from '../hooks/useHostRoom.js';
 import { useToasts } from '../hooks/useToasts.js';
 import { loadState, queueReducer, saveState } from '../lib/queue.js';
-import { fetchVideoMeta, thumbnailUrl } from '../lib/youtube.js';
+import { SEARCH_ENABLED, fetchVideoMeta, thumbnailUrl } from '../lib/youtube.js';
 import { randomId } from '../lib/id.js';
+import { SEARCH_COST, currentUsage, loadUsage, saveUsage } from '../lib/quota.js';
+import QuotaRing from '../components/QuotaRing.jsx';
 
 const YT_LOGIN_URL =
   'https://accounts.google.com/ServiceLogin?service=youtube&continue=' +
@@ -28,6 +30,9 @@ const PLAYER_ERRORS = {
 export default function HostView() {
   const [state, dispatch] = useReducer(queueReducer, undefined, loadState);
   const [started, setStarted] = useState(false);
+  const [usageRaw, setUsageRaw] = useState(loadUsage);
+  const [, setTick] = useState(0); // 날짜 변경(초기화) 반영용
+  const usage = currentUsage(usageRaw);
   const [playerKey, setPlayerKey] = useState(0); // 바뀌면 플레이어를 새로 만듦 (로그인 반영)
   const [resumeAt, setResumeAt] = useState(0);
   const [loginOpened, setLoginOpened] = useState(false);
@@ -68,6 +73,17 @@ export default function HostView() {
         case 'toggle':
           playerRef.current?.toggle();
           break;
+        case 'search':
+          // 게스트·호스트가 검색 API를 쓸 때마다 사용량 집계
+          setUsageRaw((prev) => {
+            const cur = currentUsage(prev);
+            const next = action.exhausted
+              ? { ...cur, exhausted: true }
+              : { ...cur, units: cur.units + SEARCH_COST };
+            saveUsage(next);
+            return next;
+          });
+          break;
         default:
       }
     },
@@ -79,7 +95,18 @@ export default function HostView() {
     [handleAction, push],
   );
 
-  const { peerId, status, error, guests } = useHostRoom({ enabled: true, state, onAction: handleAction });
+  // 매분 날짜 확인 → 태평양 시간 자정이 지나면 사용량 0으로
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  const roomState = useMemo(
+    () => ({ ...state, searchUsage: SEARCH_ENABLED ? usage : null }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state, usage.day, usage.units, usage.exhausted],
+  );
+  const { peerId, status, error, guests } = useHostRoom({ enabled: true, state: roomState, onAction: handleAction });
 
   const joinUrl = peerId ? `${window.location.origin}${window.location.pathname}?hostId=${peerId}` : '';
 
@@ -168,6 +195,7 @@ export default function HostView() {
                 {state.queue.length}
               </span>
             </h2>
+            <div className="ml-auto" />
             {state.queue.length > 1 && (
               <button
                 type="button"
@@ -177,9 +205,10 @@ export default function HostView() {
                 전체 삭제
               </button>
             )}
+            {SEARCH_ENABLED && <QuotaRing usage={usage} />}
           </header>
           <div className="px-4 pt-3">
-            <AddSongForm compact onAdd={(r) => local({ type: 'add', ...r })} />
+            <AddSongForm compact onAdd={(r) => local({ type: 'add', ...r })} onSearched={(r) => local({ type: 'search', ...r })} />
           </div>
           <div className="scrollbar-thin flex-1 overflow-y-auto p-4 md:min-h-0">
             <QueueList

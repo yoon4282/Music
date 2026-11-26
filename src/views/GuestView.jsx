@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ListMusic, Loader2, Music, Users, Wifi, WifiOff } from 'lucide-react';
 import AddSongForm from '../components/AddSongForm.jsx';
 import ShareButton from '../components/ShareButton.jsx';
+import QuotaRing from '../components/QuotaRing.jsx';
 import QueueList from '../components/QueueList.jsx';
 import PlayerControls from '../components/PlayerControls.jsx';
 import Toasts from '../components/Toasts.jsx';
@@ -96,7 +97,7 @@ export default function GuestView({ hostId }) {
             className="h-10 min-w-0 flex-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 text-base text-zinc-100 outline-none focus:border-violet-500"
           />
         </label>
-        <AddSongForm onAdd={(r) => send({ type: 'add', ...r })} />
+        <AddSongForm onAdd={(r) => send({ type: 'add', ...r })} onSearched={(r) => send({ type: 'search', ...r })} />
       </section>
 
       <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
@@ -119,6 +120,7 @@ export default function GuestView({ hostId }) {
             {room?.queue.length ?? 0}
           </span>
           <span className="ml-auto text-xs font-normal text-zinc-500">길게 눌러 순서 변경</span>
+          {room?.searchUsage && <QuotaRing usage={room.searchUsage} />}
         </h2>
         {room ? (
           <QueueList

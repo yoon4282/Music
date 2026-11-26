@@ -83,7 +83,25 @@ export async function searchYouTube(query) {
   const params = new URLSearchParams({
     part: 'snippet', type: 'video', videoEmbeddable: 'true', maxResults: '8', q: query, key,
   });
-  const data = await fetchJson(`https://www.googleapis.com/youtube/v3/search?${params}`, 8000);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  let data;
+  try {
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`, { signal: ctrl.signal });
+    data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const reason = data?.error?.errors?.[0]?.reason;
+      const err = new Error(
+        reason === 'quotaExceeded' || reason === 'dailyLimitExceeded'
+          ? '오늘 검색 한도를 다 썼어요. 유튜브 링크를 붙여넣어 주세요.'
+          : data?.error?.message || `HTTP ${res.status}`,
+      );
+      err.quotaExceeded = reason === 'quotaExceeded' || reason === 'dailyLimitExceeded';
+      throw err;
+    }
+  } finally {
+    clearTimeout(timer);
+  }
   const decode = (s) => {
     const el = document.createElement('textarea');
     el.innerHTML = s;
