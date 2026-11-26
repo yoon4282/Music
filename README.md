@@ -79,8 +79,20 @@ src/
   # .env → VITE_PEER_HOST=192.168.0.12  VITE_PEER_PORT=9000  VITE_PEER_PATH=/myapp  VITE_PEER_SECURE=false
   ```
 
+## 방화벽 네트워크(학교·회사 와이파이)에서 쓰기 — TURN 설정
+
+학교·회사 와이파이는 기기끼리 직접 연결(P2P)하는 것을 막는 경우가 많습니다. 이때는 **443 포트로 데이터를 중계해 주는 TURN 서버**가 필요합니다. 데이터 양이 아주 작아서 무료 플랜으로 충분합니다.
+
+1. https://www.metered.ca/stun-turn 에서 무료 가입 → 대시보드 **TURN Server → Credentials**에서 `username` / `credential`을 확인합니다.
+2. GitHub 저장소 **Settings → Secrets and variables → Actions → Variables** 탭에서 변수 2개를 추가합니다.
+   - `VITE_TURN_USERNAME` = username 값
+   - `VITE_TURN_CREDENTIAL` = credential 값
+3. **Actions → Deploy to GitHub Pages → Run workflow**로 다시 배포합니다.
+
+> TURN 계정 정보는 웹페이지 코드에 포함되므로 누구나 볼 수 있습니다. 무료 플랜 사용량 한도만 주의하면 됩니다.
+
 ## 문제 해결
 
-- **휴대폰이 접속되지 않음**: 휴대폰이 같은 Wi-Fi에 있는지, 호스트 화면을 `localhost`가 아니라 Network IP로 열었는지 확인하세요. 일부 회사·학교 네트워크는 WebRTC를 차단합니다.
+- **휴대폰이 접속되지 않음**: 로컬 실행이라면 같은 Wi-Fi인지, 호스트 화면을 `localhost`가 아닌 Network IP로 열었는지 확인하세요. 학교·회사 와이파이라면 휴대폰을 LTE로 바꿔보거나, 위의 TURN 설정을 하세요.
 - **첫 곡이 재생되지 않음**: [방 시작하기] 버튼을 건너뛰었다면 호스트 화면을 새로고침하고 버튼을 클릭하세요.
 - **특정 영상만 재생되지 않음**: 업로더가 퍼가기를 막은 영상입니다. 자동으로 건너뜁니다.

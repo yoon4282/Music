@@ -8,7 +8,7 @@ import { reorderLocal } from '../lib/queue.js';
  * 연결이 끊기면 자동으로 재연결을 시도합니다.
  */
 export function useGuestRoom({ hostId, nickname, onToast }) {
-  const [status, setStatus] = useState('connecting'); // connecting | connected | reconnecting | not-found | error
+  const [status, setStatus] = useState('connecting'); // connecting | connected | reconnecting | not-found | blocked
   const [room, setRoom] = useState(null); // { current, queue, isPlaying, guestCount }
 
   const connRef = useRef(null);
@@ -21,6 +21,7 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
     let disposed = false;
     let retryTimer = null;
     let attempts = 0;
+    let openTimer = null;
     const peer = new Peer(PEER_OPTIONS);
 
     const scheduleRetry = () => {
@@ -39,7 +40,18 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
       });
       connRef.current = conn;
 
+      // 시그널링은 됐는데 15초 안에 데이터 채널이 안 열리면 → 방화벽이 P2P를 막는 상황
+      clearTimeout(openTimer);
+      openTimer = setTimeout(() => {
+        if (!disposed && connRef.current === conn && !conn.open) {
+          setStatus('blocked');
+          conn.close();
+          scheduleRetry();
+        }
+      }, 15000);
+
       conn.on('open', () => {
+        clearTimeout(openTimer);
         attempts = 0;
         setStatus('connected');
         conn.send({ type: 'hello', nickname: nicknameRef.current });
@@ -50,12 +62,12 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
       });
       conn.on('close', () => {
         if (disposed || connRef.current !== conn) return;
-        setStatus('reconnecting');
+        setStatus((st) => (st === 'blocked' ? st : 'reconnecting'));
         scheduleRetry();
       });
       conn.on('error', () => {
         if (disposed || connRef.current !== conn) return;
-        setStatus('reconnecting');
+        setStatus((st) => (st === 'blocked' ? st : 'reconnecting'));
         scheduleRetry();
       });
     }
@@ -78,6 +90,7 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
     return () => {
       disposed = true;
       clearTimeout(retryTimer);
+      clearTimeout(openTimer);
       peer.destroy();
     };
   }, [hostId]);
