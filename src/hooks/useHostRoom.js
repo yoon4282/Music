@@ -9,7 +9,7 @@ const RELAY_TIMEOUT = 35000; // 중계 게스트가 이 시간 동안 ping이 �
 
 /**
  * 호스트 쪽 PeerJS 방.
- * - 고유 Peer ID로 시그널링 서버에 등록 (새로고침 시 같은 ID 재사용 → QR 그대로 유효)
+ * - 고유 Peer ID로 시그널링 서버에 등록 (같은 기기에서는 탭을 새로 열어도 같은 방 코드 → 예전 링크도 유효)
  * - 게스트 연결(P2P 데이터 채널 또는 중계 모드)을 관리하고, 상태 변경 시 모두에게 브로드캐스트
  * - 게스트가 보낸 action은 onAction(action, ctx)로 전달
  */
@@ -69,7 +69,7 @@ export function useHostRoom({ enabled, state, onAction }) {
 
       thisPeer.on('open', (openId) => {
         reconnectAttempts = 0;
-        try { sessionStorage.setItem(PEER_ID_KEY, openId); } catch { /* ignore */ }
+        try { localStorage.setItem(PEER_ID_KEY, openId); } catch { /* ignore */ }
         setPeerId(openId);
         setStatus('ready');
         setError(null);
@@ -133,7 +133,7 @@ export function useHostRoom({ enabled, state, onAction }) {
     };
 
     let savedId = null;
-    try { savedId = sessionStorage.getItem(PEER_ID_KEY); } catch { /* ignore */ }
+    try { savedId = localStorage.getItem(PEER_ID_KEY); } catch { /* ignore */ }
     create(savedId || `jb-${randomId(8)}`);
 
     // 응답 없는 중계 게스트 정리

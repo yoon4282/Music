@@ -116,7 +116,7 @@ export default function HostView() {
 
       {/* ── 오른쪽(1): 상단 QR / 하단 대기열 ── */}
       <aside className="flex flex-col gap-4 p-4 md:min-h-0">
-        <QrPanel joinUrl={joinUrl} status={status} error={error} guests={guests} />
+        <QrPanel joinUrl={joinUrl} roomCode={peerId} status={status} error={error} guests={guests} />
 
         <section className="flex flex-col rounded-2xl border border-zinc-800 bg-zinc-900/40 md:min-h-0 md:flex-1">
           <header className="flex items-center justify-between gap-2 px-4 pt-4">

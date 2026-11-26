@@ -33,6 +33,8 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
     let attempts = 0;
     let relayMode = false;
     let everOpened = false; // P2P가 한 번이라도 열렸는지
+    let hostMissing = false; // 시그널링 서버에 해당 방(호스트 ID)이 없음
+    let lastProbe = 0;
     let lastHostMessage = 0;
     const peer = new Peer(PEER_OPTIONS);
 
@@ -40,6 +42,11 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
       lastHostMessage = Date.now();
       if (msg?.type === 'state') setRoom(msg.state);
       else if (msg?.type === 'toast') onToastRef.current?.(msg.message, msg.kind);
+    };
+
+    const scheduleRetryForce = () => {
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(connect, 5000);
     };
 
     const scheduleRetry = () => {
@@ -52,6 +59,7 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
     // ── 중계 모드 ──
     const offRelay = onRelay(peer, (src, msg) => {
       if (src !== hostId || !relayMode) return;
+      hostMissing = false;
       if (msg?.type !== 'pong') handleHostMessage(msg);
       else lastHostMessage = Date.now();
       setStatus('connected');
@@ -59,6 +67,11 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
 
     const startRelay = () => {
       if (disposed || relayMode) return;
+      if (hostMissing) {
+        // 방 자체가 없으면 중계해도 소용없음 → '방을 찾을 수 없음' 유지하고 P2P로 계속 확인
+        scheduleRetryForce();
+        return;
+      }
       relayMode = true;
       clearTimeout(retryTimer);
       try { connRef.current?.close(); } catch { /* ignore */ }
@@ -70,7 +83,16 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
       pingTimer = setInterval(() => {
         if (peer.disconnected && !peer.destroyed) peer.reconnect();
         sendRelay(peer, hostId, { type: 'ping', nickname: nicknameRef.current });
-        if (Date.now() - lastHostMessage > HOST_SILENCE_LIMIT) setStatus('reconnecting');
+        if (Date.now() - lastHostMessage > HOST_SILENCE_LIMIT) {
+          setStatus((st) => (st === 'not-found' ? st : 'reconnecting'));
+          // 호스트가 아직 존재하는지 확인 (없으면 peer-unavailable 에러로 알 수 있음)
+          if (Date.now() - lastProbe > 30000) {
+            lastProbe = Date.now();
+            const probe = peer.connect(hostId, { reliable: true });
+            probe.on('open', () => probe.close());
+            setTimeout(() => { try { probe.close(); } catch { /* ignore */ } }, 20000);
+          }
+        }
       }, PING_INTERVAL);
     };
 
@@ -78,6 +100,7 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
     function connect() {
       if (disposed || peer.destroyed || relayMode) return;
       if (peer.disconnected) peer.reconnect();
+      hostMissing = false;
       const conn = peer.connect(hostId, {
         reliable: true,
         metadata: { nickname: nicknameRef.current },
@@ -100,6 +123,7 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
       const onLost = () => {
         if (disposed || connRef.current !== conn || relayMode) return;
         clearTimeout(openTimer);
+        if (hostMissing) return; // 방이 없어서 실패한 것 → 재시도는 에러 핸들러가 처리
         // 한 번도 열리지 못하고 실패 → 방화벽이 P2P를 막는 네트워크. 바로 중계 모드로.
         if (!everOpened) {
           startRelay();
@@ -118,11 +142,14 @@ export function useGuestRoom({ hostId, nickname, onToast }) {
     });
     peer.on('error', (err) => {
       if (disposed) return;
-      if (relayMode) return; // 중계 모드에서는 호스트 응답 여부(ping/pong)로만 상태 판단
       if (err.type === 'peer-unavailable') {
+        hostMissing = true;
         setStatus('not-found');
-        scheduleRetry();
-      } else if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(err.type)) {
+        if (!relayMode) scheduleRetryForce();
+        return;
+      }
+      if (relayMode) return; // 중계 모드에서는 호스트 응답 여부(ping/pong)로만 상태 판단
+      if (['network', 'server-error', 'socket-error', 'socket-closed', 'disconnected'].includes(err.type)) {
         setStatus('reconnecting');
         scheduleRetry();
       }

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { AlertTriangle, Check, Copy, Loader2, Users } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Loader2, Maximize2, Users, X } from 'lucide-react';
 import { copyText } from '../lib/clipboard.js';
 
 const isLocalHost = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
 
-export default function QrPanel({ joinUrl, status, error, guests }) {
+export default function QrPanel({ joinUrl, roomCode, status, error, guests }) {
   const [copied, setCopied] = useState(false);
+  const [big, setBig] = useState(false);
 
   const copy = async () => {
     if (!joinUrl) return;
@@ -18,18 +19,57 @@ export default function QrPanel({ joinUrl, status, error, guests }) {
 
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 lg:flex-row lg:items-center">
-      <div className="mx-auto flex h-40 w-40 shrink-0 items-center justify-center rounded-xl bg-white p-2.5 lg:mx-0">
+      <button
+        type="button"
+        onClick={() => joinUrl && setBig(true)}
+        aria-label="QR코드 크게 보기"
+        className="group relative mx-auto flex h-48 w-48 shrink-0 items-center justify-center rounded-xl bg-white p-3 lg:mx-0"
+      >
         {joinUrl ? (
-          <QRCodeSVG value={joinUrl} size={140} level="M" className="h-full w-full" />
+          <>
+            {/* 오류정정 L = 모듈 수가 적어 화면 촬영으로도 잘 인식됨 */}
+            <QRCodeSVG value={joinUrl} size={168} level="L" className="h-full w-full" />
+            <span className="absolute bottom-1 right-1 rounded-md bg-zinc-900/80 p-1 text-white opacity-70 group-hover:opacity-100">
+              <Maximize2 className="h-3.5 w-3.5" />
+            </span>
+          </>
         ) : (
           <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
         )}
-      </div>
+      </button>
+
+      {big && (
+        <div
+          role="dialog"
+          onClick={() => setBig(false)}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-zinc-950/95 p-6"
+        >
+          <div className="rounded-3xl bg-white p-6">
+            <QRCodeSVG
+              value={joinUrl}
+              size={512}
+              level="L"
+              style={{ width: 'min(80vw, calc(100dvh - 220px))', height: 'auto' }}
+            />
+          </div>
+          <p className="text-lg text-zinc-300">
+            방 코드 <span className="font-mono font-semibold text-white">{roomCode}</span>
+          </p>
+          <button type="button" className="flex items-center gap-1 text-sm text-zinc-400">
+            <X className="h-4 w-4" /> 닫기 (아무 곳이나 탭)
+          </button>
+        </div>
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <div>
           <h2 className="text-base font-semibold text-zinc-100">스마트폰으로 QR 스캔</h2>
-          <p className="text-xs text-zinc-400">접속하면 누구나 곡을 예약할 수 있어요</p>
+          <p className="text-xs text-zinc-400">QR을 누르면 크게 볼 수 있어요</p>
+          {roomCode && (
+            <p className="mt-1 text-xs text-zinc-500">
+              방 코드 <span className="font-mono text-zinc-200">{roomCode}</span>
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2 text-sm">

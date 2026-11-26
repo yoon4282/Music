@@ -22,7 +22,7 @@ const STATUS_TEXT = {
   connecting: '호스트에 연결 중…',
   connected: '연결됨',
   reconnecting: '연결이 끊겨 재연결 중…',
-  'not-found': '방을 찾을 수 없어요. 호스트 화면이 켜져 있는지 확인하세요.',
+  'not-found': '방을 찾을 수 없어요. 호스트 화면의 QR을 다시 스캔하세요.',
 };
 
 /** 모바일 리모컨 UI: 영상 플레이어 없이 곡 추가 + 닉네임 + 대기열 */
@@ -57,7 +57,9 @@ export default function GuestView({ hostId }) {
             <h1 className="text-base font-bold leading-tight text-white">Jukebox Remote</h1>
             <p className={`flex items-center gap-1 text-xs ${connected ? 'text-emerald-400' : 'text-amber-400'}`}>
               {connected ? <Wifi className="h-3 w-3" /> : status === 'connecting' ? <Loader2 className="h-3 w-3 animate-spin" /> : <WifiOff className="h-3 w-3" />}
-              {mode === 'relay'
+              {status === 'not-found'
+                ? STATUS_TEXT['not-found']
+                : mode === 'relay'
                 ? connected
                   ? '연결됨 (중계 모드)'
                   : status === 'reconnecting'
@@ -73,6 +75,11 @@ export default function GuestView({ hostId }) {
           </span>
         )}
       </header>
+
+      <p className="-mt-2 px-1 text-xs text-zinc-500">
+        방 코드 <span className="font-mono text-zinc-300">{hostId}</span>
+        {!connected && ' · 호스트 화면의 방 코드와 같은지 확인하세요'}
+      </p>
 
       <section className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
         <label className="flex items-center gap-3">
